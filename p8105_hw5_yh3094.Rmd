@@ -8,6 +8,7 @@ output: github_document
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 library(tidyverse)
+library(httr)
 ```
 
 # Problem 1
@@ -43,4 +44,80 @@ Participants in the experimental arm seem to have higher observations than those
 
 # Problem 2
 
-## 
+## Import the homicide data
+
+```{r homicide_data_import, message=FALSE}
+homicide_data = 
+  GET("https://raw.githubusercontent.com/washingtonpost/data-homicides/master/homicide-data.csv") %>% 
+  content("raw") %>% 
+  read_csv()
+str(homicide_data)
+```
+
+Data on homicides contains `r nrow(homicide_data)` observations and `r ncol(homicide_data)` variables. Variable for `reported_date` is class `integer`. Variables for `latitude` and `longitude` are class `numeric`. And all other variables are class `character`. 
+
+## Create a city_state variable and summarize
+
+```{r homicide_data_clean}
+homicide_data = homicide_data %>% 
+  mutate(city_state = str_c(city, state, sep = ", ")) 
+
+## summarize within cities to obtain the total number of homicides
+total_homicides = homicide_data %>% 
+  group_by(city_state) %>% 
+  summarise(n_homicides = n())
+total_homicides
+
+## summarize within cities to obtain the number of unsolved homicides
+unsolved_homicides = homicide_data %>% 
+  group_by(city_state) %>% 
+  summarise(n_unsloved = sum(disposition %in% c("Closed without arrest", "Open/No arrest")))
+unsolved_homicides
+
+homicide = full_join(total_homicides, unsolved_homicides, by = "city_state")
+homicide
+```
+
+## Data analysis of the city of Baltimore, MD
+
+```{r baltimore}
+baltimore = homicide %>% filter(city_state == "Baltimore, MD")
+prop_test_balti = prop.test(baltimore$n_unsloved, baltimore$n_homicides)
+tibble(
+  city_state = "Baltimore, MD",
+  estimated_prop = broom::tidy(prop_test_balti) %>% pull(estimate),
+  conf_low = broom::tidy(prop_test_balti) %>% pull(conf.low),
+  conf_high = broom::tidy(prop_test_balti) %>% pull(conf.high)
+)
+```
+
+## Run the analysis in the whole dataset
+
+```{r prop_test_for_whole}
+prop_test_result = function(x, n){
+  result = broom::tidy(prop.test(x, n))
+  tibble(
+    estimated_prop = result %>% pull(estimate),
+    conf_low = result %>% pull(conf.low),
+    conf_high = result %>% pull(conf.high)
+  )
+}
+
+homicide %>% 
+  mutate(prop_test_result = purrr::map2(n_unsloved, n_homicides, prop_test_result)) %>% 
+  unnest()
+```
+
+## Create a plot that shows the estimates and CIs for each city 
+
+```{r prop_test_plot}
+homicide %>% 
+  mutate(prop_test_result = purrr::map2(n_unsloved, n_homicides, prop_test_result)) %>% 
+  unnest() %>% 
+  mutate(city_state = fct_reorder(city_state, estimated_prop)) %>% 
+  ggplot(aes(x = city_state, y = estimated_prop)) +
+  geom_point() +
+  geom_errorbar(aes(ymin = conf_low, ymax = conf_high)) +
+  theme(axis.text.x = element_text(angle = 60, hjust = 1))
+```
+
