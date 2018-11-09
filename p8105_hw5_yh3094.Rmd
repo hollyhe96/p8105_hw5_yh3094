@@ -37,7 +37,10 @@ study_data %>%
   mutate(week = as.numeric(week)) %>%
   ggplot(aes(x = week, y = obs_value, color = subject_id)) +
   geom_line() +
-  facet_grid(~control_arm)
+  facet_grid(~control_arm) +
+  labs(title = "Observations on each subject over time",
+       y = "Observation",
+       x = "Week")
 ```
 
 Participants in the experimental arm seem to have higher observations than those in the control arm. In addition, participants in the experimental arm seem to have higher and higher observations over time, while this trend wasn't observed in the control arm. 
@@ -118,6 +121,9 @@ homicide %>%
   ggplot(aes(x = city_state, y = estimated_prop)) +
   geom_point() +
   geom_errorbar(aes(ymin = conf_low, ymax = conf_high)) +
-  theme(axis.text.x = element_text(angle = 60, hjust = 1))
+  theme(axis.text.x = element_text(angle = 60, hjust = 1)) +
+  labs(title = "Estimates and CIs of the proportion of unsolved homicides for each city",
+       y = "Estimated proportion",
+       x = "City state")
 ```
 
